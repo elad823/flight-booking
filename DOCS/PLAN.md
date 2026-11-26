@@ -75,14 +75,14 @@ Each step is approved before the next one starts.
 | 4 | `internal/booking`: types, statuses, errors | table tests | Done |
 | 5 | `internal/booking`: seat map (hold, release, confirm, conflicts) | table tests | Done |
 | 6 | `internal/booking`: payment code check and failure simulator | table tests | Done |
-| 7 | `FlightWorkflow` (7a: `CheckHold` / `CheckConfirm`; 7b: workflow) | testsuite | 7a done, 7b in progress |
+| 7 | `FlightWorkflow` (7a: `CheckHold` / `CheckConfirm`; 7b: workflow) | testsuite | Done |
 | 8 | Activities: inventory, payment, confirmation | unit tests | |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | |
 | 10 | `cmd/worker` | | |
 | 11 | `internal/api`: handlers behind a client interface | `httptest` | |
 | 12 | `cmd/server` with graceful shutdown | | |
 | 13 | `web/index.html` | | |
-| 14 | README and end-to-end run against `temporal server start-dev` | `make race`, `make lint` | |
+| 14 | README and end-to-end run against `temporal server start-dev` (include: a lapsed hold shows as available in the `available` Query on a real server) | `make race`, `make lint` | |
 | 15 | Scaling hardening: 2 s poll interval, idempotency key on payment, "Scaling notes" in README | | |
 
 ## Scaling notes (for Step 15)
