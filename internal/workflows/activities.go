@@ -94,8 +94,7 @@ func (a *Activities) updateFlight(ctx context.Context, flightID, updateName stri
 		return nil
 	}
 
-	var appErr *temporal.ApplicationError
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*temporal.ApplicationError](err); ok {
 		return temporal.NewNonRetryableApplicationError(appErr.Error(), appErr.Type(), err)
 	}
 	return fmt.Errorf("%s update on flight %s: %w", updateName, flightID, err)

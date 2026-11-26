@@ -258,8 +258,8 @@ func checkActivityErr(t *testing.T, err error, wantOK bool, wantType string, wan
 	if err == nil {
 		t.Fatal("error = nil, want an error")
 	}
-	var appErr *temporal.ApplicationError
-	if !errors.As(err, &appErr) {
+	appErr, ok := errors.AsType[*temporal.ApplicationError](err)
+	if !ok {
 		t.Fatalf("error = %v, want an ApplicationError", err)
 	}
 	if wantType != "" && appErr.Type() != wantType {

@@ -47,6 +47,24 @@ Tracks the agreed plan for the Flight Booking System. Requirements: `DOCS/requir
 - **Why:** `GetContinueAsNewSuggested()` covers history size, event count, and 90% of the Update limit, so we track nothing ourselves. The workflow waits for `AllHandlersFinished` first so no Update is cut off. Tested with the testsuite's `SetContinueAsNewSuggested(true)`.
 - **Rejected:** Our own Update counter. It duplicates what the server tracks and can drift from the real limits.
 
+### 9. The pay Update returns once accepted
+
+- **Why:** Payment can take up to a minute with retries. The handler moves the order to PAYING and returns at once; the UI already polls status and sees the result there. HTTP requests stay short.
+- **Rejected:** Waiting for the result in the Update, which would hold the HTTP request open for the whole payment.
+
+### 10. Order handlers take a workflow.Mutex
+
+- **Why:** The seat-change handler waits on an activity, so without a lock a second request could run mid-way and leave the order and the flight disagreeing about the seats. Every handler re-checks the status after taking the lock, because the validator ran before the wait.
+- **Note:** `workflow.Mutex` guarantees one request at a time, not arrival order (its Lock is an Await on "unlocked"). The re-check keeps every order of execution correct.
+- **Rejected:** A busy flag that rejects requests while a change is in progress; the UI would have to retry.
+
+### 11. Clicking pay stops the timer; payment confirms or fails the order
+
+- **Choice:** The 15-minute timer stops when payment starts and never resumes, because payment either confirms the order or fails it (after 3 attempts, as the spec says). Payment gets 10 seconds per attempt, 3 attempts, and one minute in total from the click (`ScheduleToCloseTimeout`).
+- **Why:** A user who pays in the last second still gets a full payment. The one-minute cap stops a stuck payment from holding the order forever.
+- **Flight backstop:** the flight holds seats until the order's deadline plus 2 minutes: one for a last-second payment and one for confirming the seats.
+- **Rejected:** Resuming the timer after a failed payment so the user can pay again. It would change the spec's rule that the order fails after 3 failures.
+
 Assumptions:
 - Flights are a fixed list in code (for example 3 flights with 30 seats each).
 - An order with no seats selected closes after 15 minutes.
@@ -77,7 +95,7 @@ Each step is approved before the next one starts.
 | 6 | `internal/booking`: payment code check and failure simulator | table tests | Done |
 | 7 | `FlightWorkflow` (7a: `CheckHold` / `CheckConfirm`; 7b: workflow) | testsuite | Done |
 | 8 | Activities: inventory, payment, confirmation | unit tests | Done |
-| 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | |
+| 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | Done |
 | 10 | `cmd/worker` | | |
 | 11 | `internal/api`: handlers behind a client interface | `httptest` | |
 | 12 | `cmd/server` with graceful shutdown | | |

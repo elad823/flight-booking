@@ -171,8 +171,8 @@ func checkUpdateErr(t *testing.T, op flightOp, err error) {
 		}
 		return
 	}
-	var appErr *temporal.ApplicationError
-	if !errors.As(err, &appErr) || appErr.Type() != op.wantErr {
+	appErr, ok := errors.AsType[*temporal.ApplicationError](err)
+	if !ok || appErr.Type() != op.wantErr {
 		t.Errorf("%s %+v: error = %v, want type %s", op.update, op.arg, err, op.wantErr)
 	}
 }
@@ -207,8 +207,9 @@ func TestFlightWorkflowContinuesAsNew(t *testing.T) {
 		Inventory: *booking.NewInventory([]string{"1A", "1B"}),
 	})
 
-	var canErr *workflow.ContinueAsNewError
-	if err := env.GetWorkflowError(); !errors.As(err, &canErr) {
+	err := env.GetWorkflowError()
+	canErr, ok := errors.AsType[*workflow.ContinueAsNewError](err)
+	if !ok {
 		t.Fatalf("workflow error = %v, want ContinueAsNewError", err)
 	}
 	var next FlightInput
