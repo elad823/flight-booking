@@ -76,7 +76,7 @@ Each step is approved before the next one starts.
 | 5 | `internal/booking`: seat map (hold, release, confirm, conflicts) | table tests | Done |
 | 6 | `internal/booking`: payment code check and failure simulator | table tests | Done |
 | 7 | `FlightWorkflow` (7a: `CheckHold` / `CheckConfirm`; 7b: workflow) | testsuite | Done |
-| 8 | Activities: inventory, payment, confirmation | unit tests | |
+| 8 | Activities: inventory, payment, confirmation | unit tests | Done |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | |
 | 10 | `cmd/worker` | | |
 | 11 | `internal/api`: handlers behind a client interface | `httptest` | |
