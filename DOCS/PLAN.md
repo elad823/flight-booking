@@ -59,7 +59,7 @@ Each step is approved before the next one starts.
 | 3 | `Makefile` (build, run, test, race, lint, fmt) | | Done |
 | 4 | `internal/booking`: types, statuses, errors | table tests | Done |
 | 5 | `internal/booking`: seat map (hold, release, confirm, conflicts) | table tests | Done |
-| 6 | `internal/booking`: payment code check and failure simulator | table tests | |
+| 6 | `internal/booking`: payment code check and failure simulator | table tests | Done |
 | 7 | `FlightWorkflow` | testsuite | |
 | 8 | Activities: inventory, payment, confirmation | unit tests | |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | |
