@@ -4,15 +4,22 @@
 package workflows
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
+	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"flightbooking/internal/booking"
 )
+
+// TaskQueue is the Temporal task queue the worker polls and clients start
+// workflows on.
+const TaskQueue = "booking"
 
 // Names of the FlightWorkflow's Updates and Query.
 const (
@@ -123,6 +130,29 @@ func FlightWorkflow(ctx workflow.Context, in FlightInput) error {
 		FlightID:  in.FlightID,
 		Inventory: *inv,
 	})
+}
+
+// workflowStarter is the part of client.Client StartFlights uses.
+type workflowStarter interface {
+	ExecuteWorkflow(ctx context.Context, options client.StartWorkflowOptions, workflow any, args ...any) (client.WorkflowRun, error)
+}
+
+// StartFlights starts a FlightWorkflow for each flight with all seats free.
+// A flight whose workflow is already running keeps it, along with its seat
+// map, so restarting the worker never resets bookings.
+func StartFlights(ctx context.Context, c workflowStarter, flights []booking.Flight) error {
+	for _, f := range flights {
+		opts := client.StartWorkflowOptions{
+			ID:                       FlightWorkflowID(f.ID),
+			TaskQueue:                TaskQueue,
+			WorkflowIDConflictPolicy: enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
+		}
+		in := FlightInput{FlightID: f.ID, Inventory: *booking.NewInventory(f.Seats)}
+		if _, err := c.ExecuteWorkflow(ctx, opts, FlightWorkflow, in); err != nil {
+			return fmt.Errorf("start flight %s: %w", f.ID, err)
+		}
+	}
+	return nil
 }
 
 // seatError turns a booking error into a non-retryable ApplicationError

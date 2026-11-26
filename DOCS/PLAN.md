@@ -96,7 +96,7 @@ Each step is approved before the next one starts.
 | 7 | `FlightWorkflow` (7a: `CheckHold` / `CheckConfirm`; 7b: workflow) | testsuite | Done |
 | 8 | Activities: inventory, payment, confirmation | unit tests | Done |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | Done |
-| 10 | `cmd/worker` (10a: flight catalog; 10b: worker) | | 10a done, 10b next |
+| 10 | `cmd/worker` (10a: flight catalog; 10b: worker) | smoke test on dev server | Done |
 | 11 | `internal/api`: handlers behind a client interface | `httptest` | |
 | 12 | `cmd/server` with graceful shutdown | | |
 | 13 | `web/index.html` | | |

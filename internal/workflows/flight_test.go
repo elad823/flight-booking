@@ -1,12 +1,15 @@
 package workflows
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"testing"
 	"time"
 
+	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
@@ -238,4 +241,66 @@ func mapsEqual(got, want map[string]booking.Seat) bool {
 		}
 	}
 	return true
+}
+
+// fakeStarter records StartFlights' calls and fails on failOn's flight.
+type fakeStarter struct {
+	failOn string
+	opts   []client.StartWorkflowOptions
+	inputs []FlightInput
+}
+
+func (f *fakeStarter) ExecuteWorkflow(_ context.Context, opts client.StartWorkflowOptions, _ any, args ...any) (client.WorkflowRun, error) {
+	f.opts = append(f.opts, opts)
+	in, _ := args[0].(FlightInput)
+	f.inputs = append(f.inputs, in)
+	if opts.ID == FlightWorkflowID(f.failOn) {
+		return nil, errors.New("server unavailable")
+	}
+	return nil, nil
+}
+
+func TestStartFlights(t *testing.T) {
+	t.Parallel()
+
+	flights := []booking.Flight{
+		{ID: "F1", Seats: []string{"01A", "01B"}},
+		{ID: "F2", Seats: []string{"01A"}},
+	}
+
+	tests := []struct {
+		name        string
+		failOn      string
+		wantErr     bool
+		wantStarted int
+	}{
+		{"starts every flight", "", false, 2},
+		{"stops at the first failure", "F1", true, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fake := &fakeStarter{failOn: tt.failOn}
+
+			err := StartFlights(context.Background(), fake, flights)
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("StartFlights() error = %v, want error %v", err, tt.wantErr)
+			}
+			if len(fake.opts) != tt.wantStarted {
+				t.Fatalf("started %d flights, want %d", len(fake.opts), tt.wantStarted)
+			}
+			for i, opts := range fake.opts {
+				f := flights[i]
+				if opts.ID != FlightWorkflowID(f.ID) || opts.TaskQueue != TaskQueue ||
+					opts.WorkflowIDConflictPolicy != enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING {
+					t.Errorf("flight %s options = %+v", f.ID, opts)
+				}
+				if got := fake.inputs[i]; got.FlightID != f.ID || !slices.Equal(got.Inventory.Available(start), f.Seats) {
+					t.Errorf("flight %s input = %+v, want all seats free", f.ID, got)
+				}
+			}
+		})
+	}
 }
