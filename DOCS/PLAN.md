@@ -103,7 +103,7 @@ Each step is approved before the next one starts.
 | 8 | Activities: inventory, payment, confirmation | unit tests | Done |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | Done |
 | 10 | `cmd/worker` (10a: flight catalog; 10b: worker) | smoke test on dev server | Done |
-| 11 | `internal/api` (11a: handlers and `Booking` interface; 11b: Temporal adapter) | `httptest` | 11a done, 11b in progress |
+| 11 | `internal/api` (11a: handlers and `Booking` interface; 11b: Temporal adapter) | `httptest` | Done |
 | 12 | `cmd/server` with graceful shutdown | | |
 | 13 | `web/index.html` | | |
 | 14 | README and end-to-end run against `temporal server start-dev` (include: a lapsed hold shows as available in the `available` Query on a real server) | `make race`, `make lint` | |
