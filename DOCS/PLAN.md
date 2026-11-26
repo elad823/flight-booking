@@ -65,6 +65,12 @@ Tracks the agreed plan for the Flight Booking System. Requirements: `DOCS/requir
 - **Flight backstop:** the flight holds seats until the order's deadline plus 2 minutes: one for a last-second payment and one for confirming the seats.
 - **Rejected:** Resuming the timer after a failed payment so the user can pay again. It would change the spec's rule that the order fails after 3 failures.
 
+### 12. HTTP handlers depend on a small `Booking` interface
+
+- **Why:** Handlers only do HTTP: parse the request, call `Booking`, and map its errors to status codes. One adapter implements `Booking` with the Temporal client (workflow IDs, Update options, result decoding, error types). Handler tests use a tiny fake with no Temporal types.
+- **Errors:** `Booking` returns `*api.Error` with a kind (invalid, not found, conflict) for anything the user can act on. Any other error is logged and answered with a plain 500, so internal details never reach the browser.
+- **Rejected:** Handlers calling the Temporal client directly. Every handler would mix HTTP with workflow plumbing, and tests would need fakes of three SDK types.
+
 Assumptions:
 - Flights are a fixed list in code (for example 3 flights with 30 seats each).
 - An order with no seats selected closes after 15 minutes.
@@ -97,7 +103,7 @@ Each step is approved before the next one starts.
 | 8 | Activities: inventory, payment, confirmation | unit tests | Done |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | Done |
 | 10 | `cmd/worker` (10a: flight catalog; 10b: worker) | smoke test on dev server | Done |
-| 11 | `internal/api`: handlers behind a client interface | `httptest` | |
+| 11 | `internal/api` (11a: handlers and `Booking` interface; 11b: Temporal adapter) | `httptest` | 11a done, 11b in progress |
 | 12 | `cmd/server` with graceful shutdown | | |
 | 13 | `web/index.html` | | |
 | 14 | README and end-to-end run against `temporal server start-dev` (include: a lapsed hold shows as available in the `available` Query on a real server) | `make race`, `make lint` | |
