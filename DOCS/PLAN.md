@@ -56,8 +56,8 @@ Each step is approved before the next one starts.
 |---|---|---|---|
 | 1 | `git init`, `go mod init`, `.gitignore` | | Done |
 | 2 | `.golangci.yml` (v2) | | Done |
-| 3 | `Makefile` (build, run, test, race, lint, fmt) | | In progress |
-| 4 | `internal/booking`: types, statuses, errors | table tests | |
+| 3 | `Makefile` (build, run, test, race, lint, fmt) | | Done |
+| 4 | `internal/booking`: types, statuses, errors | table tests | Done |
 | 5 | `internal/booking`: seat map (hold, release, confirm, conflicts) | table tests | |
 | 6 | `internal/booking`: payment code check and failure simulator | table tests | |
 | 7 | `FlightWorkflow` | testsuite | |
