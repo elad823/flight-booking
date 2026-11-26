@@ -1,4 +1,4 @@
-// Command server runs the booking system's REST API. It talks to the
+// Command server runs the booking system's REST API and web UI. It talks to the
 // workflows through Temporal and serves until it receives SIGINT or SIGTERM,
 // then finishes in-flight requests before exiting.
 //
@@ -24,6 +24,7 @@ import (
 	tlog "go.temporal.io/sdk/log"
 
 	"flightbooking/internal/api"
+	"flightbooking/web"
 )
 
 const (
@@ -56,9 +57,8 @@ func run() error {
 	}
 	defer c.Close()
 
-	handler := api.NewHandler(api.NewTemporalBooking(c), slog.Default())
 	srv := &http.Server{
-		Handler:           http.TimeoutHandler(handler, requestTimeout, `{"error":"request timed out"}`),
+		Handler:           routes(api.NewTemporalBooking(c), slog.Default()),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      requestTimeout + 5*time.Second,
@@ -93,6 +93,15 @@ func run() error {
 		return fmt.Errorf("shut down: %w", err)
 	}
 	return nil
+}
+
+// routes returns the server's handler: the API under /api/ and the web UI
+// everywhere else, each request bounded by requestTimeout.
+func routes(b api.Booking, log *slog.Logger) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/api/", api.NewHandler(b, log))
+	mux.Handle("/", web.Handler())
+	return http.TimeoutHandler(mux, requestTimeout, `{"error":"request timed out"}`)
 }
 
 // envOr returns the environment variable key, or fallback when it is unset.

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flight Booking</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; color: #1d2433; }
+  h1 { font-size: 1.5rem; }
+  section { margin: 1.5rem 0; }
+  button { font: inherit; padding: 0.4rem 0.9rem; cursor: pointer; }
+  button:disabled { cursor: default; opacity: 0.5; }
+  .flights button { margin: 0 0.5rem 0.5rem 0; }
+  .status { padding: 0.75rem 1rem; border-radius: 6px; background: #eef1f6; }
+  .status.CONFIRMED { background: #dcf3e2; }
+  .status.FAILED, .status.EXPIRED { background: #fbe0e0; }
+  .timer { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+  .error { color: #b3261e; min-height: 1.25rem; }
+  .seats { display: grid; grid-template-columns: 2.5rem repeat(3, 3rem); gap: 0.4rem; align-items: center; }
+  .seat { padding: 0.5rem 0; border: 1px solid #9aa4b5; border-radius: 4px; background: #fff; }
+  .seat.selected { background: #cfe0ff; border-color: #2f6fdb; }
+  .seat.held { background: #2f6fdb; border-color: #2f6fdb; color: #fff; }
+  .seat.taken { background: #e3e6eb; color: #8a93a3; }
+  .legend span { margin-right: 1rem; }
+  input { font: inherit; padding: 0.35rem; width: 6rem; letter-spacing: 0.2em; }
+</style>
+</head>
+<body>
+<h1>Flight Booking</h1>
+
+<section id="choose">
+  <h2>Choose a flight</h2>
+  <div class="flights" id="flights"></div>
+</section>
+
+<section id="order" hidden>
+  <div class="status" id="status"></div>
+  <p class="timer" id="timer"></p>
+
+  <div id="select">
+    <h2>Seats</h2>
+    <p class="legend"><span>Blue: held for you</span><span>Light blue: selected</span><span>Grey: taken</span></p>
+    <div class="seats" id="seats"></div>
+    <p><button id="hold">Hold selected seats</button></p>
+  </div>
+
+  <form id="pay">
+    <h2>Payment</h2>
+    <label>5-digit code <input id="code" inputmode="numeric" maxlength="5" autocomplete="off"></label>
+    <button>Pay</button>
+  </form>
+
+  <p><button id="restart" hidden>Book another flight</button></p>
+</section>
+
+<!-- Outside both sections so errors show on either screen. -->
+<p class="error" id="error"></p>
+
+<script>
+"use strict";
+
+// The page keeps no booking state of its own: the order workflow is the
+// source of truth, and the page polls it. Only the unsent seat selection
+// lives here. Text from the server is always set with textContent, never
+// parsed as HTML.
+
+const POLL_MS = 2000;
+const TERMINAL = ["CONFIRMED", "FAILED", "EXPIRED"];
+const $ = (id) => document.getElementById(id);
+
+let flights = [];
+let order = null;       // last order status from the server
+let available = [];     // free seats on the order's flight
+let selected = new Set(); // seats picked but not yet held
+let pollTimer = null;
+
+async function call(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
+  if (!res.ok) {
+    throw new Error((data && data.error) || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
+function showError(err) {
+  $("error").textContent = err ? err.message : "";
+}
+
+async function loadFlights() {
+  flights = await call("GET", "/api/flights");
+  const box = $("flights");
+  box.replaceChildren();
+  for (const f of flights) {
+    const b = document.createElement("button");
+    b.textContent = `${f.id}: ${f.from} to ${f.to}`;
+    b.onclick = () => startOrder(f.id).catch(showError);
+    box.append(b);
+  }
+}
+
+async function startOrder(flightId) {
+  showError(null);
+  order = await call("POST", "/api/orders", { flightId });
+  location.hash = order.id; // reloading the page resumes this order
+  selected = new Set();
+  await refresh();
+}
+
+// refresh polls the order and its flight's seats, then redraws.
+async function refresh() {
+  clearTimeout(pollTimer);
+  try {
+    order = await call("GET", `/api/orders/${encodeURIComponent(order.id)}`);
+    if (!TERMINAL.includes(order.status)) {
+      available = (await call("GET", `/api/flights/${encodeURIComponent(order.flightId)}/seats`)).available;
+    }
+  } catch (err) {
+    showError(err);
+  }
+  render();
+  if (!TERMINAL.includes(order.status)) {
+    pollTimer = setTimeout(refresh, POLL_MS);
+  }
+}
+
+function render() {
+  $("choose").hidden = true;
+  $("order").hidden = false;
+
+  const st = $("status");
+  st.className = `status ${order.status}`;
+  st.textContent = `Order ${order.id} on ${order.flightId}: ${order.status}` +
+    (order.message ? `. ${order.message}` : "");
+
+  const open = !TERMINAL.includes(order.status);
+  const canChange = order.status === "CREATED" || order.status === "SEATS_HELD";
+  $("select").hidden = !canChange;
+  $("pay").hidden = order.status !== "SEATS_HELD";
+  $("restart").hidden = open;
+  if (canChange) renderSeats();
+  renderTimer();
+}
+
+function renderSeats() {
+  const flight = flights.find((f) => f.id === order.flightId);
+  const held = new Set(order.seats);
+  const free = new Set(available);
+  const grid = $("seats");
+  grid.replaceChildren();
+
+  let row = "";
+  for (const seat of flight.seats) {
+    const r = seat.slice(0, -1);
+    if (r !== row) {
+      row = r;
+      const label = document.createElement("span");
+      label.textContent = r;
+      grid.append(label);
+    }
+    const b = document.createElement("button");
+    b.textContent = seat.slice(-1);
+    b.title = seat;
+    b.className = "seat";
+    if (held.has(seat) && !selected.size) b.classList.add("held");
+    if (selected.has(seat)) b.classList.add("selected");
+    const mine = held.has(seat) || selected.has(seat);
+    if (!free.has(seat) && !mine) {
+      b.classList.add("taken");
+      b.disabled = true;
+    }
+    b.onclick = () => toggleSeat(seat);
+    grid.append(b);
+  }
+  $("hold").disabled = selected.size === 0;
+}
+
+function toggleSeat(seat) {
+  // Start a new selection from the seats already held.
+  if (!selected.size) selected = new Set(order.seats);
+  if (selected.has(seat)) selected.delete(seat); else selected.add(seat);
+  renderSeats();
+}
+
+// renderTimer shows the time left from expiresAt. It runs every second in
+// the browser, so polling only has to catch status changes.
+function renderTimer() {
+  const t = $("timer");
+  if (!order.expiresAt || TERMINAL.includes(order.status)) {
+    t.textContent = order.status === "PAYING" ? "Timer stopped while payment runs" : "";
+    return;
+  }
+  const left = Math.max(0, new Date(order.expiresAt) - Date.now());
+  const m = Math.floor(left / 60000);
+  const s = Math.floor((left % 60000) / 1000);
+  t.textContent = `Seats held for ${m}:${String(s).padStart(2, "0")}`;
+}
+
+$("hold").onclick = async () => {
+  showError(null);
+  try {
+    order = await call("PUT", `/api/orders/${encodeURIComponent(order.id)}/seats`, { seats: [...selected].sort() });
+    selected = new Set();
+  } catch (err) {
+    showError(err);
+  }
+  await refresh();
+};
+
+$("pay").onsubmit = async (e) => {
+  e.preventDefault();
+  showError(null);
+  try {
+    await call("POST", `/api/orders/${encodeURIComponent(order.id)}/payment`, { code: $("code").value });
+    $("code").value = "";
+  } catch (err) {
+    showError(err);
+  }
+  await refresh();
+};
+
+$("restart").onclick = () => {
+  clearTimeout(pollTimer);
+  order = null;
+  history.replaceState(null, "", location.pathname);
+  showError(null);
+  $("order").hidden = true;
+  $("choose").hidden = false;
+};
+
+setInterval(() => { if (order) renderTimer(); }, 1000);
+
+(async () => {
+  try {
+    await loadFlights();
+    const id = location.hash.slice(1);
+    if (id) {
+      order = await call("GET", `/api/orders/${encodeURIComponent(id)}`);
+      await refresh();
+    }
+  } catch (err) {
+    history.replaceState(null, "", location.pathname);
+    showError(err);
+  }
+})();
+</script>
+</body>
+</html>

@@ -105,9 +105,9 @@ Each step is approved before the next one starts.
 | 10 | `cmd/worker` (10a: flight catalog; 10b: worker) | smoke test on dev server | Done |
 | 11 | `internal/api` (11a: handlers and `Booking` interface; 11b: Temporal adapter) | `httptest` | Done |
 | 12 | `cmd/server` with graceful shutdown | full-stack curl run | Done |
-| 13 | `web/index.html` | | |
+| 13 | `web/index.html` (polls every 2 s) | headless Chrome render | Done |
 | 14 | README and end-to-end run against `temporal server start-dev` (include: a lapsed hold shows as available in the `available` Query on a real server) | `make race`, `make lint` | |
-| 15 | Scaling hardening: 2 s poll interval, idempotency key on payment, "Scaling notes" in README | | |
+| 15 | Scaling hardening: idempotency key on payment, "Scaling notes" in README | | |
 
 ## Scaling notes (for Step 15)
 
