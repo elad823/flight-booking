@@ -141,6 +141,11 @@ func TestSeatActivities(t *testing.T) {
 				t.Errorf("UpdateID = %q, WaitForStage = %v; want an ID and Completed", fake.got.UpdateID, fake.got.WaitForStage)
 			}
 			checkActivityErr(t, err, tt.sendErr == nil && tt.getErr == nil, tt.wantErrType, tt.wantRetryable)
+			// The flight's message reaches the user, so it must pass through
+			// as written, without the error chain's decorations.
+			if appErr, ok := errors.AsType[*temporal.ApplicationError](err); ok && tt.wantErrType != "" && appErr.Message() != "seat 1A: seat unavailable" {
+				t.Errorf("message = %q, want %q", appErr.Message(), "seat 1A: seat unavailable")
+			}
 		})
 	}
 }
