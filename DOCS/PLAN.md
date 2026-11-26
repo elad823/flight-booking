@@ -107,9 +107,9 @@ Each step is approved before the next one starts.
 | 12 | `cmd/server` with graceful shutdown | full-stack curl run | Done |
 | 13 | `web/index.html` (polls every 2 s) | headless Chrome render | Done |
 | 14 | README and end-to-end run against `temporal server start-dev` (include: a lapsed hold shows as available in the `available` Query on a real server) | `make race`, `make lint`, E2E via `make temporal` + `make run` | Done |
-| 15 | Scaling hardening: idempotency key on payment, "Scaling notes" in README | | |
+| 15 | Scaling notes in README (payment idempotency documented, not coded: the simulator charges nothing) | | Done |
 
-## Scaling notes (for Step 15)
+## Scaling notes (draft; the maintained version is in README.md)
 
 - `temporal server start-dev` is for development only; production needs a Temporal cluster or Temporal Cloud.
 - Every status poll is a Query served by a worker; at large scale, poll less often, push with SSE, or serve reads from a separate store.

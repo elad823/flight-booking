@@ -151,3 +151,31 @@ make lint
 - **No login.** An order's ID is 128 random bits and acts as its access key.
 - **The countdown uses the browser's clock.** A wrong device clock shifts the
   display; the server's timer is the one that decides.
+
+## Scaling notes
+
+What would change before running this for real traffic:
+
+- **Temporal itself.** `temporal server start-dev` is for development. In
+  production the server and worker connect to a Temporal cluster or Temporal
+  Cloud, and both scale out: the server holds no state, and any number of
+  workers can poll the same task queue.
+- **Status polling.** Every poll is a Query, which a worker answers by
+  loading the workflow. At large scale, poll less often, push updates with
+  server-sent events, or serve reads from a separate store that the workflows
+  write to.
+- **A very popular flight.** One `FlightWorkflow` handles every request for
+  its flight, one at a time. Temporal also caps a workflow run at 10
+  in-flight Updates (callers past that get `ResourceExhausted`) and 2,000
+  Updates in total, which is why the flight continues as new when the server
+  suggests it. If one flight outgrows that, split its seats into sections,
+  each with its own workflow.
+- **Payment idempotency.** Activities run at least once: if a worker charges
+  the card and dies before reporting back, Temporal runs the activity again.
+  The simulator charges nothing, so this repo doesn't need a key, but a real
+  gateway call does. Derive the key from the order (for example its workflow
+  ID), so every retry of the same charge sends the same key. Check how the
+  gateway treats a repeated key: Stripe's v1 API stores the first answer and
+  replays it, declines included, so after a known decline the next attempt
+  needs a new key, while after a timeout (outcome unknown) it must reuse the
+  old one. Stripe's v2 API re-runs a request that failed instead.
