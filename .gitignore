@@ -1,0 +1,18 @@
+# Build output
+/bin/
+
+# Test and coverage artifacts
+*.test
+*.out
+coverage.html
+
+# Local environment
+.env
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+
+# Source PDF kept out of the public repo
+DOCS/Flight Booking System.pdf
