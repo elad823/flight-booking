@@ -116,6 +116,13 @@ func TestInventoryHold(t *testing.T) {
 			t.Parallel()
 			inv := &Inventory{Seats: maps.Clone(tt.initial)}
 
+			if err := inv.CheckHold(tt.orderID, tt.seats, tt.now); !errors.Is(err, tt.wantErr) {
+				t.Fatalf("CheckHold() error = %v, want %v", err, tt.wantErr)
+			}
+			if !maps.Equal(inv.Seats, tt.initial) {
+				t.Fatalf("CheckHold() changed seats to %v", inv.Seats)
+			}
+
 			err := inv.Hold(tt.orderID, tt.seats, tt.now, later)
 
 			if !errors.Is(err, tt.wantErr) {
@@ -243,6 +250,13 @@ func TestInventoryConfirm(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			inv := &Inventory{Seats: maps.Clone(tt.initial)}
+
+			if err := inv.CheckConfirm(tt.orderID, tt.seats); !errors.Is(err, tt.wantErr) {
+				t.Fatalf("CheckConfirm() error = %v, want %v", err, tt.wantErr)
+			}
+			if !maps.Equal(inv.Seats, tt.initial) {
+				t.Fatalf("CheckConfirm() changed seats to %v", inv.Seats)
+			}
 
 			err := inv.Confirm(tt.orderID, tt.seats)
 

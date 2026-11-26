@@ -32,6 +32,21 @@ Tracks the agreed plan for the Flight Booking System. Requirements: `DOCS/requir
 
 - **Why:** The lint config is written for the installed golangci-lint version (v2 format). The temporal CLI provides `temporal server start-dev` for local runs without Docker.
 
+### 6. Flight workflows start eagerly at startup
+
+- **Why:** Every flight exists before any order, so listing available seats always works. Starting uses `WorkflowIDConflictPolicy: USE_EXISTING`, so a restart reuses running flights.
+- **Rejected:** Update-with-Start on the first hold. Reads would have to handle a flight workflow that doesn't exist yet, and the reservation activity would need each flight's seat list.
+
+### 7. Flight Updates use a validator and a handler
+
+- **Why:** A rejected Update (such as "seat taken") leaves nothing in history, so busy flights use less of the 2,000-Update budget. The validator calls the read-only `CheckHold` / `CheckConfirm`, and the handler re-checks inside `Hold` / `Confirm`.
+- **Rejected:** Handler only. Every rejection would be recorded in history.
+
+### 8. Continue-As-New follows the server's suggestion
+
+- **Why:** `GetContinueAsNewSuggested()` covers history size, event count, and 90% of the Update limit, so we track nothing ourselves. The workflow waits for `AllHandlersFinished` first so no Update is cut off. Tested with the testsuite's `SetContinueAsNewSuggested(true)`.
+- **Rejected:** Our own Update counter. It duplicates what the server tracks and can drift from the real limits.
+
 Assumptions:
 - Flights are a fixed list in code (for example 3 flights with 30 seats each).
 - An order with no seats selected closes after 15 minutes.
@@ -60,7 +75,7 @@ Each step is approved before the next one starts.
 | 4 | `internal/booking`: types, statuses, errors | table tests | Done |
 | 5 | `internal/booking`: seat map (hold, release, confirm, conflicts) | table tests | Done |
 | 6 | `internal/booking`: payment code check and failure simulator | table tests | Done |
-| 7 | `FlightWorkflow` | testsuite | |
+| 7 | `FlightWorkflow` (7a: `CheckHold` / `CheckConfirm`; 7b: workflow) | testsuite | 7a done, 7b in progress |
 | 8 | Activities: inventory, payment, confirmation | unit tests | |
 | 9 | `OrderWorkflow` | testsuite: timer reset, expiry, retries, failure | |
 | 10 | `cmd/worker` | | |
@@ -74,5 +89,5 @@ Each step is approved before the next one starts.
 
 - `temporal server start-dev` is for development only; production needs a Temporal cluster or Temporal Cloud.
 - Every status poll is a Query served by a worker; at large scale, poll less often, push with SSE, or serve reads from a separate store.
-- One very popular flight serializes all its requests in one workflow; Temporal also limits in-flight and total Updates per workflow run (exact limits to verify). Fix by sharding a flight into sections.
+- One very popular flight serializes all its requests in one workflow; Temporal also limits each workflow run to 10 in-flight and 2,000 total Updates by default; past 10 in flight, callers get `ResourceExhausted`. Fix by sharding a flight into sections.
 - Activities run at least once, so a real payment call needs an idempotency key to avoid double charges.

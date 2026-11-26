@@ -64,6 +64,19 @@ func NewInventory(seatIDs []string) *Inventory {
 // calling Hold again both changes the selection and refreshes the hold.
 // It is all or nothing: on error, the inventory is unchanged.
 func (inv *Inventory) Hold(orderID string, seatIDs []string, now, until time.Time) error {
+	if err := inv.CheckHold(orderID, seatIDs, now); err != nil {
+		return err
+	}
+
+	inv.Release(orderID)
+	for _, id := range seatIDs {
+		inv.Seats[id] = Seat{OrderID: orderID, HeldUntil: until}
+	}
+	return nil
+}
+
+// CheckHold returns the error Hold would return, without changing anything.
+func (inv *Inventory) CheckHold(orderID string, seatIDs []string, now time.Time) error {
 	if orderID == "" {
 		return ErrMissingOrderID
 	}
@@ -85,11 +98,6 @@ func (inv *Inventory) Hold(orderID string, seatIDs []string, now, until time.Tim
 		if !seat.freeFor(orderID, now) {
 			return fmt.Errorf("seat %s: %w", id, ErrSeatUnavailable)
 		}
-	}
-
-	inv.Release(orderID)
-	for _, id := range seatIDs {
-		inv.Seats[id] = Seat{OrderID: orderID, HeldUntil: until}
 	}
 	return nil
 }
@@ -113,6 +121,18 @@ func (inv *Inventory) Release(orderID string) {
 // taken by anyone else. It is all or nothing, and confirming the same seats
 // twice succeeds, so retries are safe.
 func (inv *Inventory) Confirm(orderID string, seatIDs []string) error {
+	if err := inv.CheckConfirm(orderID, seatIDs); err != nil {
+		return err
+	}
+
+	for _, id := range seatIDs {
+		inv.Seats[id] = Seat{OrderID: orderID, Booked: true}
+	}
+	return nil
+}
+
+// CheckConfirm returns the error Confirm would return, without changing anything.
+func (inv *Inventory) CheckConfirm(orderID string, seatIDs []string) error {
 	if orderID == "" {
 		return ErrMissingOrderID
 	}
@@ -128,10 +148,6 @@ func (inv *Inventory) Confirm(orderID string, seatIDs []string) error {
 		if seat.OrderID != orderID {
 			return fmt.Errorf("seat %s: %w", id, ErrNotHeld)
 		}
-	}
-
-	for _, id := range seatIDs {
-		inv.Seats[id] = Seat{OrderID: orderID, Booked: true}
 	}
 	return nil
 }
